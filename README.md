@@ -24,11 +24,11 @@ Most rices spend the GPU on glass, blur and springy animations. **ash** spends i
 
 | | |
 |---|---|
-| ⚡ **Instant** | Blur, shadows and animations off. Windows appear the frame they're created. |
-| 🎮 **Low latency** | Tearing (`immediate`) + direct scanout for fullscreen games, VRR only in fullscreen, 1-frame GL queue. |
-| 🪶 **Tiny** | No display manager (TTY1 → Hyprland), `yambar` instead of a Qt/GTK bar, tray and GPU tools written in C. |
-| 🔥 **TURBO mode** | One click on the bar: fans 100%, GPU locked to P0 + overclock, CPU boost, max PPT. |
-| 🎨 **One palette** | Terminal, bar, launcher, notifications, GTK and folder icons all share the *ash* colors. |
+| **Instant** | Blur, shadows and animations off. Windows appear the frame they're created. |
+| **Low latency** | Tearing (`immediate`) + direct scanout for fullscreen games, VRR only in fullscreen, 1-frame GL queue. |
+| **Tiny** | No display manager (TTY1 → Hyprland), `yambar` instead of a Qt/GTK bar, tray and GPU tools written in C. |
+| **TURBO mode** | One click on the bar: fans 100%, GPU locked to P0 + overclock, CPU boost, max PPT. |
+| **One palette** | Terminal, bar, launcher, notifications, GTK and folder icons all share the *ash* colors. |
 
 ---
 
