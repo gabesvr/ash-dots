@@ -1,0 +1,127 @@
+/* GTK3 — paleta "ash" por cima do Adwaita-dark (Thunar, pavucontrol...)
+   grafite #2a2b31 · texto #cfd0c8 · khaki #d6cf8a · verde-água #9fd4c0 */
+
+@define-color ash_bg      #2a2b31;
+@define-color ash_base    #232428;
+@define-color ash_surface #313238;
+@define-color ash_border  #3a3c44;
+@define-color ash_fg      #cfd0c8;
+@define-color ash_dim     #7a7d85;
+@define-color ash_accent  #d6cf8a;
+@define-color ash_cyan    #9fd4c0;
+
+/* Cores nomeadas usadas pelo Adwaita */
+@define-color theme_bg_color            @ash_bg;
+@define-color theme_base_color          @ash_base;
+@define-color theme_fg_color            @ash_fg;
+@define-color theme_text_color          @ash_fg;
+@define-color theme_selected_bg_color   @ash_accent;
+@define-color theme_selected_fg_color   #1d1e22;
+@define-color theme_unfocused_bg_color  @ash_bg;
+@define-color theme_unfocused_base_color @ash_base;
+@define-color theme_unfocused_fg_color  @ash_fg;
+@define-color theme_unfocused_text_color @ash_fg;
+@define-color theme_unfocused_selected_bg_color @ash_accent;
+@define-color theme_unfocused_selected_fg_color #1d1e22;
+@define-color insensitive_bg_color      @ash_bg;
+@define-color insensitive_fg_color      @ash_dim;
+@define-color borders                   @ash_border;
+@define-color unfocused_borders         @ash_border;
+@define-color accent_color              @ash_accent;
+@define-color accent_bg_color           @ash_accent;
+@define-color accent_fg_color           #1d1e22;
+@define-color window_bg_color           @ash_bg;
+@define-color view_bg_color             @ash_base;
+@define-color headerbar_bg_color        @ash_bg;
+
+/* Janela e barras */
+window, .background, headerbar, .titlebar, toolbar, menubar, statusbar {
+    background-color: @ash_bg;
+    background-image: none;
+    color: @ash_fg;
+    box-shadow: none;
+    border-color: @ash_border;
+}
+
+/* Lista de arquivos */
+.view, treeview, iconview, textview text, scrolledwindow {
+    background-color: @ash_base;
+    color: @ash_fg;
+}
+treeview header button {
+    background: @ash_bg;
+    color: @ash_dim;
+    border-color: @ash_border;
+}
+
+/* Seleção: fundo sutil + texto khaki (igual ao fuzzel) */
+.view:selected, treeview:selected, iconview:selected,
+.view:selected:focus, treeview:selected:focus, iconview:selected:focus,
+row:selected, flowboxchild:selected {
+    background-color: alpha(@ash_fg, 0.10);
+    color: @ash_accent;
+}
+.view:hover, treeview:hover, row:hover {
+    background-color: alpha(@ash_fg, 0.05);
+}
+
+/* Barra lateral (favoritos) */
+.sidebar, .sidebar .view, placessidebar, placessidebar list, .shortcuts-pane {
+    background-color: @ash_bg;
+    color: @ash_fg;
+    border-right: 1px solid @ash_border;
+}
+placessidebar row:selected {
+    background-color: alpha(@ash_accent, 0.12);
+    color: @ash_accent;
+}
+
+/* Entradas (barra de caminho, busca) */
+entry {
+    background-color: @ash_surface;
+    color: @ash_fg;
+    border: 1px solid @ash_border;
+    border-radius: 0;
+    box-shadow: none;
+}
+entry:focus { border-color: @ash_accent; }
+entry selection { background-color: @ash_accent; color: #1d1e22; }
+
+/* Botões */
+button {
+    background-image: none;
+    background-color: @ash_surface;
+    color: @ash_fg;
+    border: 1px solid @ash_border;
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
+}
+button:hover   { background-color: shade(@ash_surface, 1.15); }
+button:checked, button:active { background-color: alpha(@ash_accent, 0.18); color: @ash_accent; }
+button.flat, toolbar button { background-color: transparent; border-color: transparent; }
+
+/* Menus e popovers */
+menu, .menu, .context-menu, popover, popover.background {
+    background-color: @ash_base;
+    color: @ash_fg;
+    border: 1px solid @ash_border;
+}
+menu menuitem:hover, .menu menuitem:hover, modelbutton:hover {
+    background-color: alpha(@ash_accent, 0.15);
+    color: @ash_accent;
+}
+
+/* Abas */
+notebook, notebook header, notebook tabs { background-color: @ash_bg; border-color: @ash_border; }
+notebook tab { color: @ash_dim; }
+notebook tab:checked { color: @ash_accent; box-shadow: inset 0 -2px @ash_accent; }
+
+/* Barras de rolagem e progresso */
+scrollbar { background-color: transparent; border: none; }
+scrollbar slider { background-color: alpha(@ash_fg, 0.25); border-radius: 0; min-width: 6px; min-height: 6px; }
+scrollbar slider:hover { background-color: @ash_accent; }
+progressbar progress, levelbar block.filled { background-color: @ash_accent; }
+
+/* Links e texto secundário */
+*:link, .dim-label { color: @ash_cyan; }

@@ -1,0 +1,23 @@
+; cava — visualizador de áudio (paleta "ash")
+[general]
+framerate = 144
+bars = 0
+bar_width = 3
+bar_spacing = 1
+sleep_timer = 5
+
+[input]
+method = pipewire
+
+[output]
+method = noncurses
+
+[color]
+background = default
+gradient = 1
+gradient_color_1 = '#8c8757'
+gradient_color_2 = '#d6cf8a'
+gradient_color_3 = '#f0ebc0'
+
+[smoothing]
+noise_reduction = 77

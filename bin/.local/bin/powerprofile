@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# powerprofile toggle|eco|set <perfil> — troca o perfil de energia e atualiza o yambar na hora
+#   toggle: balanced ⇄ TURBO          (clique esquerdo na barra)
+#   eco:    power-saver ⇄ balanced     (clique direito)
+#   set performance|balanced|power-saver   (gamemode)
+# TURBO = /usr/local/bin/ash-turbo (ventoinhas 100%, GPU P0 + overclock, limites no máximo)
+cur=$(powerprofilesctl get)
+case ${1:-toggle} in
+    toggle) [[ $cur == performance ]] && new=balanced || new=performance ;;
+    eco)    [[ $cur == power-saver ]] && new=balanced || new=power-saver ;;
+    set)    new=$2 ;;
+esac
+
+case $new in
+    performance) sudo -n /usr/local/bin/ash-turbo on ;;
+    balanced)    sudo -n /usr/local/bin/ash-turbo off ;;
+    power-saver) sudo -n /usr/local/bin/ash-turbo off && powerprofilesctl set power-saver ;;
+esac
+pkill -USR1 -f '^bash [^ ]*/yambar-status$'   # acorda o script da barra

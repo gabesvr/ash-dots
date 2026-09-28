@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# tray-click N left|right — clique num ícone da bandeja do yambar (estado vem do ash-tray)
+#   left:  abre o app (Activate); se o app não suporta, mostra o menu
+#   right: menu do app (dbusmenu) no fuzzel
+state="$XDG_RUNTIME_DIR/ash-tray"
+IFS=$'\t' read -r bus path menu is_menu glyph title < <(sed -n "${1}p" "$state") || exit 0
+[[ -n $bus ]] || exit 0
+
+if [[ $2 == left && $is_menu == 0 ]] &&
+   busctl --user call "$bus" "$path" org.kde.StatusNotifierItem Activate ii 0 0 >/dev/null 2>&1; then
+    exit 0
+fi
+[[ $menu != / ]] || exit 0
+
+call() { local m=$1; shift; busctl --user call "$bus" "$menu" com.canonical.dbusmenu "$m" "$@"; }
+
+call AboutToShow i 0 >/dev/null 2>&1
+
+# Achata o menu em "rótulo<TAB>id"; submenus viram "Pai › Filho"
+id=$(busctl --user --json=short call "$bus" "$menu" com.canonical.dbusmenu GetLayout iias -- 0 -1 0 | jq -r '
+    def val($k; $d): (.[$k].data // $d);
+    def entries($prefix):
+        .[2][] | .data as [$id, $p, $kids]
+        | select($p | val("visible"; true)) | select(($p | val("type"; "")) != "separator")
+        | ($p | val("label"; "") | gsub("_"; "")) as $label | select($label != "")
+        | (if ($p | val("toggle-type"; "")) != ""
+           then (if ($p | val("toggle-state"; 0)) == 1 then "● " else "○ " end) else "" end) as $mark
+        | if ($p | val("children-display"; "")) == "submenu"
+          then [$id, $p, $kids] | entries($prefix + $mark + $label + " › ")
+          elif ($p | val("enabled"; true)) then "\($prefix)\($mark)\($label)\t\($id)"
+          else empty end;
+    .data[1] | entries("")' |
+    fuzzel --dmenu --with-nth=1 --accept-nth=2 --prompt "$glyph  " --placeholder "$title" --lines 12) || exit 0
+
+[[ -n $id ]] && call Event isvu -- "$id" clicked i 0 "$(date +%s)" >/dev/null

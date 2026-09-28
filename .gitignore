@@ -1,0 +1,6 @@
+*.bak*
+*.swp
+__pycache__/
+src/ash-tray
+src/nvoc
+src/mouse-hz

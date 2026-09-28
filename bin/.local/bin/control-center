@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+# control-center — central de controle no fuzzel (SUPER+C / clique no sino da barra)
+# Wi-Fi, Bluetooth, Tailscale, não perturbe, notificações, saída de áudio, perfil de energia, sessão.
+#
+# Cada menu recebe linhas "texto<TAB>chave": o fuzzel mostra o texto e devolve a chave.
+bin="$HOME/.local/bin"
+
+menu() {  # menu "título" "ícone"  (stdin: texto\tchave)  → chave
+    fuzzel --dmenu --with-nth=1 --accept-nth=2 --prompt "$2  " --placeholder "$1" --lines 12 --width 44
+}
+
+row() { printf '%s\t%s\n' "$1" "$2"; }
+
+# ── Wi-Fi ───────────────────────────────────────────────────
+wifi_status() {  # sem scan: lê as conexões ativas (instantâneo)
+    [[ $(nmcli radio wifi) == enabled ]] || { echo "desligado"; return; }
+    nmcli -t -f NAME,TYPE con show --active | awk -F: '$2 ~ /wireless/ {print $1; f=1; exit} END{if(!f) print "sem conexão"}'
+}
+
+wifi_menu() {
+    local key pass
+    key=$( {
+        if [[ $(nmcli radio wifi) == enabled ]]; then
+            # lista em cache (instantâneo) + scan em segundo plano para a próxima vez
+            nmcli dev wifi rescan >/dev/null 2>&1 &
+            nmcli -t -f IN-USE,SIGNAL,SECURITY,SSID dev wifi list --rescan no |
+                awk -F: '$4!="" && !seen[$4]++ {
+                    icon = $2>75 ? "󰤨" : $2>50 ? "󰤥" : $2>25 ? "󰤢" : "󰤟"
+                    lock = ($3=="" || $3=="--") ? " " : "󰌾"
+                    printf "%s %s %s  %s\t%s%s\n", ($1=="*" ? "●" : " "), icon, lock, $4, (lock=="󰌾" ? "+" : "-"), $4 }'
+            row "󰖪  Desligar Wi-Fi" ":off"   # por último: Enter sem querer não derruba a rede
+        else
+            row "󰖩  Ligar Wi-Fi" ":on"
+        fi
+    } | menu "Wi-Fi" "󰖩") || return
+
+    case $key in
+        :off) nmcli radio wifi off ;;
+        :on)  nmcli radio wifi on ;;
+        *)
+            local ssid=${key:1}
+            if nmcli -t -f NAME con show | grep -qxF "$ssid"; then
+                nmcli con up id "$ssid" >/dev/null
+            elif [[ ${key:0:1} == + ]]; then
+                pass=$(fuzzel --dmenu --password --prompt "󰌾  " --placeholder "Senha de $ssid" --lines 0 </dev/null) || return
+                nmcli dev wifi connect "$ssid" password "$pass" >/dev/null
+            else
+                nmcli dev wifi connect "$ssid" >/dev/null
+            fi && notify-send -a Wi-Fi "Conectado" "$ssid" || notify-send -u critical -a Wi-Fi "Falha ao conectar" "$ssid"
+            ;;
+    esac
+}
+
+# ── Bluetooth ───────────────────────────────────────────────
+bt_on() { bluetoothctl show | grep -q "Powered: yes"; }
+
+bt_status() {
+    bt_on || { echo "desligado"; return; }
+    local names; names=$(bluetoothctl devices Connected | cut -d' ' -f3- | paste -sd, -)
+    echo "${names:-ligado}"
+}
+
+bt_menu() {
+    local key mac name
+    key=$( {
+        if bt_on; then
+            bluetoothctl devices | while read -r _ mac name; do
+                if bluetoothctl info "$mac" | grep -q "Connected: yes"
+                then row "● 󰂱  $name" "-$mac"
+                else row "  󰂯  $name" "+$mac"; fi
+            done
+            row "󰂰  Procurar dispositivos (8s)" ":scan"
+            row "󰂲  Desligar Bluetooth" ":off"
+        else
+            row "󰂯  Ligar Bluetooth" ":on"
+        fi
+    } | menu "Bluetooth" "󰂯") || return
+
+    case $key in
+        :off)  bluetoothctl power off >/dev/null ;;
+        :on)   rfkill unblock bluetooth; bluetoothctl power on >/dev/null ;;
+        :scan) notify-send -u low -a Bluetooth "Procurando…" "8 segundos"
+               bluetoothctl --timeout 8 scan on >/dev/null; bt_menu ;;
+        -*)    bluetoothctl disconnect "${key:1}" >/dev/null ;;
+        +*)    mac=${key:1}
+               bluetoothctl pair "$mac" >/dev/null 2>&1; bluetoothctl trust "$mac" >/dev/null
+               name=$(bluetoothctl info "$mac" | sed -n 's/^\s*Name: //p')
+               bluetoothctl connect "$mac" >/dev/null && notify-send -a Bluetooth "Conectado" "$name" \
+                   || notify-send -u critical -a Bluetooth "Falha ao conectar" "$name" ;;
+    esac
+}
+
+# ── Tailscale ───────────────────────────────────────────────
+# up/down sem sudo: exige "sudo tailscale set --operator=$USER" (feito no install.sh)
+ts_on() { [[ $(tailscale status --json 2>/dev/null | jq -r .BackendState) == Running ]]; }
+
+ts_toggle() {
+    if ts_on; then
+        tailscale down && notify-send -a Tailscale "Desligado"
+    else
+        tailscale up && notify-send -a Tailscale "Ligado" "$(tailscale ip -4)"
+    fi || notify-send -u critical -a Tailscale "Falha" "Rode: sudo tailscale set --operator=$USER"
+}
+
+# ── Áudio ───────────────────────────────────────────────────
+default_sink_name() {
+    pactl -f json list sinks | jq -r --arg d "$(pactl get-default-sink)" '.[] | select(.name == $d) | .description'
+}
+
+audio_menu() {
+    local key
+    key=$(pactl -f json list sinks | jq -r --arg d "$(pactl get-default-sink)" \
+        '.[] | "\(if .name == $d then "●" else " " end) 󰕾  \(.description)\t\(.name)"' |
+        menu "Saída de áudio" "󰕾") || return
+    pactl set-default-sink "$key"
+}
+
+# ── Energia / sessão ────────────────────────────────────────
+profile_menu() {
+    local key
+    key=$( {
+        row "󱐋  TURBO — tudo no máximo" performance
+        row "󰾅  BAL — equilibrado"       balanced
+        row "󰌪  SILENT — economia"       power-saver
+    } | menu "Perfil de energia" "󱐋") || return
+    "$bin/powerprofile" set "$key"
+}
+
+session_menu() {
+    local key
+    key=$( {
+        row "󰤄  Suspender"        suspend
+        row "󰜉  Reiniciar"        reboot
+        row "󰐥  Desligar"         poweroff
+        row "󰍃  Sair do Hyprland" exit
+    } | menu "Sessão" "󰐥") || return
+    case $key in
+        exit) hyprctl dispatch 'hl.dsp.exit()' ;;
+        *)    systemctl "$key" ;;
+    esac
+}
+
+# ── Principal ───────────────────────────────────────────────
+main() {
+    local dnd notifs profile key
+    [[ $("$bin/notif" status) == dnd ]] && dnd=1
+    notifs=0; pgrep -x fnott >/dev/null && notifs=$(fnottctl list | grep -c '^[0-9]')
+    case $(</sys/firmware/acpi/platform_profile) in performance) profile=TURBO ;; quiet) profile=SILENT ;; *) profile=BAL ;; esac
+
+    key=$( {
+        row "󰖩  Wi-Fi · $(wifi_status)"         wifi
+        row "󰂯  Bluetooth · $(bt_status)"      bt
+        if [[ $dnd ]]; then row "󰂛  Não perturbe · ligado" dnd
+        else                row "󰂚  Não perturbe · desligado" dnd; fi
+        if ts_on; then row "󰖂  Tailscale · ligado" ts
+        else           row "󰖂  Tailscale · desligado" ts; fi
+        row "󰎟  Fechar notificações ($notifs)" clear
+        row "󰕾  Áudio · $(default_sink_name)"  audio
+        row "󱐋  Energia · $profile"            profile
+        row "󰐥  Sessão"                        session
+    } | menu "Central de controle" "󰒓") || exit 0
+
+    case $key in
+        wifi)    wifi_menu ;;
+        bt)      bt_menu ;;
+        dnd)     "$bin/notif" dnd toggle ;;
+        clear)   "$bin/notif" clear ;;
+        ts)      ts_toggle ;;
+        audio)   audio_menu ;;
+        profile) profile_menu ;;
+        session) session_menu ;;
+    esac
+}
+
+main

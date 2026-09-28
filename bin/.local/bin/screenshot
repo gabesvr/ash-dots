@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# screenshot region|full|window — salva em ~/Pictures/Screenshots e copia pro clipboard
+dir="$HOME/Pictures/Screenshots"; mkdir -p "$dir"
+file="$dir/$(date +%Y-%m-%d_%H-%M-%S).png"
+case "$1" in
+    region) geom=$(slurp) || exit 1; grim -g "$geom" "$file" ;;
+    window) geom=$(hyprctl activewindow -j | jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"') || exit 1
+            grim -g "$geom" "$file" ;;
+    *)      grim "$file" ;;
+esac
+wl-copy < "$file"

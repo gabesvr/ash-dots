@@ -1,0 +1,2 @@
+# Libera só o ash-turbo sem senha (clique no TURBO da barra / gamemode)
+%wheel ALL=(root) NOPASSWD: /usr/local/bin/ash-turbo

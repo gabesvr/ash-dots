@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# ash-turbo on|off|sync|status — desempenho máximo do ASUS TUF A16 (FA607NUG)
+# Roda como root (sudoers: /etc/sudoers.d/ash-turbo). Chamado por ~/.local/bin/powerprofile.
+#
+#   on     perfil performance + ventoinhas 100% + GPU em P0 com overclock + limites ASUS no máximo
+#   off    volta tudo ao automático (perfil balanced)
+#   sync   aplica on/off conforme o perfil atual (usado no boot)
+#   status mostra o estado atual
+set -u
+
+# Overclock da GPU (MHz). No teto de energia (~88 W) o offset rende mais MHz por watt.
+# +225 / +1500 deu artefatos (chuvisco na tela) — não passar de 150 / 1000.
+GPU_CORE_OFFSET=150
+GPU_MEM_OFFSET=1000
+GPU_MIN_LOCK=1800          # trava clock mínimo do core → GPU fica em P0
+
+ARMOURY=/sys/class/firmware-attributes/asus-armoury/attributes
+hwmon() { local h; h=$(grep -l "^$1\$" /sys/class/hwmon/hwmon*/name | head -1); echo "${h%/name}"; }
+FAN_HWMON=$(hwmon asus)                    # leitura de RPM
+FAN_CURVE=$(hwmon asus_custom_fan_curve)   # curva de ventoinha (TUF não aceita pwm fixo)
+
+nv_offsets() { /usr/local/bin/nvoc "$1" "$2" >/dev/null; }  # NVML (src/nvoc.c), funciona no Wayland
+
+armoury_max() {  # põe um atributo ASUS no valor máximo permitido
+    local a=$ARMOURY/$1
+    [[ -f $a/max_value ]] && cat "$a/max_value" > "$a/current_value"
+}
+
+fans() {  # max = curva toda em 100% · auto = curva de fábrica do perfil
+    local p i
+    for p in 1 2; do
+        if [[ $1 == max ]]; then
+            for i in {1..8}; do echo 255 > "$FAN_CURVE/pwm${p}_auto_point${i}_pwm"; done
+            echo 1 > "$FAN_CURVE/pwm${p}_enable"
+        else
+            echo 2 > "$FAN_CURVE/pwm${p}_enable"
+        fi
+    done
+}
+
+on() {
+    powerprofilesctl set performance
+    for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > "$f"; done
+    echo 1 > /sys/devices/system/cpu/cpufreq/boost
+    for a in ppt_pl1_spl ppt_pl2_sppt ppt_pl3_fppt nv_dynamic_boost nv_temp_target; do armoury_max "$a"; done
+    fans max
+    nvidia-smi -pm 1 >/dev/null
+    nv_offsets "$GPU_CORE_OFFSET" "$GPU_MEM_OFFSET"
+    local max_gr max_mem
+    max_gr=$(nvidia-smi --query-gpu=clocks.max.graphics --format=csv,noheader,nounits)
+    max_mem=$(nvidia-smi --query-gpu=clocks.max.memory --format=csv,noheader,nounits)
+    nvidia-smi -lgc "$GPU_MIN_LOCK,$((max_gr + GPU_CORE_OFFSET))" >/dev/null
+    nvidia-smi -lmc "$max_mem,$max_mem" >/dev/null
+    scxctl switch -s lavd -m gaming >/dev/null 2>&1
+}
+
+off() {
+    nvidia-smi -rgc >/dev/null
+    nvidia-smi -rmc >/dev/null
+    nv_offsets 0 0
+    fans auto
+    scxctl switch -s lavd -m auto >/dev/null 2>&1
+    [[ ${1:-} == keep-profile ]] || powerprofilesctl set balanced
+}
+
+status() {
+    echo "perfil:     $(powerprofilesctl get)"
+    echo "ventoinhas: $( [[ $(cat "$FAN_CURVE"/pwm1_enable) == 1 ]] && echo 100% || echo auto) · $(cat "$FAN_HWMON"/fan1_input) / $(cat "$FAN_HWMON"/fan2_input) RPM"
+    echo "cpu:        $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor) · boost $(cat /sys/devices/system/cpu/cpufreq/boost) · PPT $(cat $ARMOURY/ppt_pl1_spl/current_value)W"
+    echo "gpu:        $(nvidia-smi --query-gpu=pstate,clocks.gr,clocks.mem,power.draw,temperature.gpu --format=csv,noheader)"
+    echo "scx:        $(scxctl get)"
+}
+
+case ${1:-status} in
+    on)     on ;;
+    off)    off ;;
+    sync)   [[ $(powerprofilesctl get) == performance ]] && on || off keep-profile ;;
+    status) status ;;
+    *)      echo "uso: ash-turbo on|off|sync|status" >&2; exit 1 ;;
+esac

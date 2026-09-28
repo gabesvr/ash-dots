@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Cria o tema de ícones "Papirus-Ash": herda Papirus-Dark e troca as pastas
+# pela variante de cor escolhida (padrão: teal). Sem root.  Uso: papirus-ash [cor]
+set -euo pipefail
+color=${1:-teal}
+src=/usr/share/icons/Papirus
+dst=$HOME/.local/share/icons/Papirus-Ash
+
+rm -rf "$dst"
+dirs=()
+for places in "$src"/*/places; do
+    size=$(basename "$(dirname "$places")")
+    mkdir -p "$dst/$size/places"
+    dirs+=("$size/places")
+    for f in "$places"/folder-"$color"*.svg "$places"/user-"$color"-*.svg; do
+        [[ -e $f ]] || continue
+        name=$(basename "$f")
+        ln -sf "$f" "$dst/$size/places/${name/-$color/}"
+    done
+done
+
+{
+    echo "[Icon Theme]"
+    echo "Name=Papirus-Ash"
+    echo "Inherits=Papirus-Dark,Adwaita,hicolor"
+    echo "Directories=$(IFS=,; echo "${dirs[*]}")"
+    echo
+    for d in "${dirs[@]}"; do
+        size=${d%%/*}; px=${size%%x*}; scale=1
+        [[ $size == *@2x ]] && scale=2
+        printf '[%s]\nSize=%s\nScale=%s\nContext=Places\nType=Fixed\n\n' "$d" "$px" "$scale"
+    done
+} > "$dst/index.theme"
+gtk-update-icon-cache -q "$dst" 2>/dev/null || true
+echo "Papirus-Ash criado ($color): $(find "$dst" -type l | wc -l) ícones"

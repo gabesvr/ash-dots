@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# yambar: não perturbe + perfil de energia + temperatura de CPU e GPU (a cada 5s)
+# SIGUSR1 força atualização imediata (enviado pelo script powerprofile)
+
+cpu_hwmon=$(grep -l k10temp /sys/class/hwmon/hwmon*/name | head -1)
+cpu_hwmon=${cpu_hwmon%/name}
+
+trap : USR1
+
+while true; do
+    case $(</sys/firmware/acpi/platform_profile) in
+        performance) profile=TURBO ;;
+        quiet)       profile=SILENT ;;
+        *)           profile=BAL ;;
+    esac
+    cpu=$(( $(<"$cpu_hwmon/temp1_input") / 1000 ))
+    gpu=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null || echo "?")
+
+    echo "profile|string|$profile"
+    echo "cpu|int|$cpu"
+    echo "gpu|string|$gpu"
+    echo "dnd|string|$("$HOME/.local/bin/notif" status)"
+    echo
+    sleep 5 & wait $!   # "wait" é interrompido pelo USR1
+    kill $! 2>/dev/null
+done

@@ -1,0 +1,159 @@
+# yambar — barra superior (gerado em partes por um script; editar à vontade)
+# MODELO: o script `bar` gera a config real. %N% = tamanho em px para escala 1
+# (multiplicado pela compensação de escala do monitor); @MONITOR@ = saída escolhida.
+# Cores RRGGBBAA — paleta "ash"
+bg:     &bg     1d1e22ff
+fg:     &fg     cfd0c8ff
+dim:    &dim    7a7d85ff
+yellow: &yellow d6cf8aff
+cyan:   &cyan   9fd4c0ff
+red:    &red    e46b6bff
+
+bar:
+  location: top
+  monitor: @MONITOR@
+  height: %38%
+  layer: top
+  spacing: %6%
+  margin: %16%
+  background: *bg
+  foreground: *fg
+  font: JetBrainsMono Nerd Font:pixelsize=%19%
+
+  left:
+    - script:
+        path: /home/gabriel/.local/bin/yambar-workspaces
+        content:
+          list:
+            spacing: 0
+            items:
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    ws1 == active:   {string: {text: "1", foreground: *yellow, margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=1})", deco: {underline: {size: %2%, color: *yellow}}}}
+                    ws1 == occupied: {string: {text: "1", foreground: *dim,    margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=1})"}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    ws2 == active:   {string: {text: "2", foreground: *yellow, margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=2})", deco: {underline: {size: %2%, color: *yellow}}}}
+                    ws2 == occupied: {string: {text: "2", foreground: *dim,    margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=2})"}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    ws3 == active:   {string: {text: "3", foreground: *yellow, margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=3})", deco: {underline: {size: %2%, color: *yellow}}}}
+                    ws3 == occupied: {string: {text: "3", foreground: *dim,    margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=3})"}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    ws4 == active:   {string: {text: "4", foreground: *yellow, margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=4})", deco: {underline: {size: %2%, color: *yellow}}}}
+                    ws4 == occupied: {string: {text: "4", foreground: *dim,    margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=4})"}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    ws5 == active:   {string: {text: "5", foreground: *yellow, margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=5})", deco: {underline: {size: %2%, color: *yellow}}}}
+                    ws5 == occupied: {string: {text: "5", foreground: *dim,    margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=5})"}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    ws6 == active:   {string: {text: "6", foreground: *yellow, margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=6})", deco: {underline: {size: %2%, color: *yellow}}}}
+                    ws6 == occupied: {string: {text: "6", foreground: *dim,    margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=6})"}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    ws7 == active:   {string: {text: "7", foreground: *yellow, margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=7})", deco: {underline: {size: %2%, color: *yellow}}}}
+                    ws7 == occupied: {string: {text: "7", foreground: *dim,    margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=7})"}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    ws8 == active:   {string: {text: "8", foreground: *yellow, margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=8})", deco: {underline: {size: %2%, color: *yellow}}}}
+                    ws8 == occupied: {string: {text: "8", foreground: *dim,    margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=8})"}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    ws9 == active:   {string: {text: "9", foreground: *yellow, margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=9})", deco: {underline: {size: %2%, color: *yellow}}}}
+                    ws9 == occupied: {string: {text: "9", foreground: *dim,    margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=9})"}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    ws10 == active:   {string: {text: "10", foreground: *yellow, margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=10})", deco: {underline: {size: %2%, color: *yellow}}}}
+                    ws10 == occupied: {string: {text: "10", foreground: *dim,    margin: %9%, on-click: "hyprctl dispatch hl.dsp.focus({workspace=10})"}}
+
+  center:
+    - clock:
+        date-format: "%a %d/%m"
+        time-format: "%H:%M"
+        content:
+          - string: {text: "{date}", foreground: *dim}
+          - string: {text: "{time}", foreground: *fg, left-margin: %8%}
+
+  right:
+    # Bandeja: apps em segundo plano (esq = abrir, dir = menu no fuzzel)
+    - script:
+        path: /home/gabriel/.local/bin/ash-tray
+        content:
+          list:
+            spacing: 0
+            items:
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    tray1_on: {string: {text: "{tray1}", foreground: *fg, margin: %8%, on-click: {left: /home/gabriel/.local/bin/tray-click 1 left, right: /home/gabriel/.local/bin/tray-click 1 right}}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    tray2_on: {string: {text: "{tray2}", foreground: *fg, margin: %8%, on-click: {left: /home/gabriel/.local/bin/tray-click 2 left, right: /home/gabriel/.local/bin/tray-click 2 right}}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    tray3_on: {string: {text: "{tray3}", foreground: *fg, margin: %8%, on-click: {left: /home/gabriel/.local/bin/tray-click 3 left, right: /home/gabriel/.local/bin/tray-click 3 right}}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    tray4_on: {string: {text: "{tray4}", foreground: *fg, margin: %8%, on-click: {left: /home/gabriel/.local/bin/tray-click 4 left, right: /home/gabriel/.local/bin/tray-click 4 right}}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    tray5_on: {string: {text: "{tray5}", foreground: *fg, margin: %8%, on-click: {left: /home/gabriel/.local/bin/tray-click 5 left, right: /home/gabriel/.local/bin/tray-click 5 right}}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    tray6_on: {string: {text: "{tray6}", foreground: *fg, margin: %8%, on-click: {left: /home/gabriel/.local/bin/tray-click 6 left, right: /home/gabriel/.local/bin/tray-click 6 right}}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    tray7_on: {string: {text: "{tray7}", foreground: *fg, margin: %8%, on-click: {left: /home/gabriel/.local/bin/tray-click 7 left, right: /home/gabriel/.local/bin/tray-click 7 right}}}
+              - map:
+                  default: {empty: {}}
+                  conditions:
+                    tray8_on: {string: {text: "{tray8}", foreground: *fg, margin: %8%, on-click: {left: /home/gabriel/.local/bin/tray-click 8 left, right: /home/gabriel/.local/bin/tray-click 8 right}}}
+    - script:
+        path: /home/gabriel/.local/bin/yambar-status
+        content:
+          # sino: esq = central de controle, dir = não perturbe
+          - map:
+              default: {string: {text: "󰂚", foreground: *dim, right-margin: %14%, on-click: {left: /home/gabriel/.local/bin/control-center, right: /home/gabriel/.local/bin/notif dnd toggle}}}
+              conditions:
+                dnd == dnd: {string: {text: "󰂛", foreground: *red, right-margin: %14%, on-click: {left: /home/gabriel/.local/bin/control-center, right: /home/gabriel/.local/bin/notif dnd toggle}}}
+          - map:
+              default: {string: {text: "󰾅 {profile}", foreground: *dim, on-click: {left: /home/gabriel/.local/bin/powerprofile toggle, right: /home/gabriel/.local/bin/powerprofile eco}}}
+              conditions:
+                profile == TURBO:  {string: {text: "󱐋 TURBO",  foreground: *red,  on-click: {left: /home/gabriel/.local/bin/powerprofile toggle, right: /home/gabriel/.local/bin/powerprofile eco}}}
+                profile == SILENT: {string: {text: "󰌪 SILENT", foreground: *cyan, on-click: {left: /home/gabriel/.local/bin/powerprofile toggle, right: /home/gabriel/.local/bin/powerprofile eco}}}
+          - string: {text: "󰻠 {cpu}°", foreground: *fg, left-margin: %14%}
+          - string: {text: "󰢮 {gpu}°", foreground: *fg, left-margin: %14%}
+    - battery:
+        name: BAT1
+        poll-interval: 30000
+        content:
+          map:
+            default:
+              ramp:
+                tag: capacity
+                items:
+                  - string: {text: "󰁺 {capacity}%", foreground: *red, left-margin: %14%}
+                  - string: {text: "󰁼 {capacity}%", foreground: *yellow, left-margin: %14%}
+                  - string: {text: "󰁾 {capacity}%", foreground: *yellow, left-margin: %14%}
+                  - string: {text: "󰂀 {capacity}%", foreground: *yellow, left-margin: %14%}
+                  - string: {text: "󰁹 {capacity}%", foreground: *yellow, left-margin: %14%}
+            conditions:
+              state == charging: {string: {text: "󰂄 {capacity}%", foreground: *cyan, left-margin: %14%}}

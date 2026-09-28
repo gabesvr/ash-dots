@@ -1,0 +1,31 @@
+// Logo: figlet, fonte "Delta Corps Priest 1" (a mesma do logo do Omarchy)
+// fastfetch — abre no início do fish (fish_greeting)
+{
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+        "type": "file",
+        "source": "~/.config/fastfetch/ash.txt",
+        "color": { "1": "yellow", "2": "cyan" },
+        "position": "top",
+        "padding": { "top": 1, "left": 1 }
+    },
+    "display": {
+        "separator": "",
+        "color": { "keys": "yellow", "output": "white" },
+        "key": { "width": 13 },
+        "percent": { "type": 1, "green": 70, "yellow": 90 }
+    },
+    "modules": [
+        { "type": "custom", "format": "\u001b[90m┌─ Hardware ──────────────────────────┐" },
+        { "type": "cpu",     "key": "│ 󰻠 CPU",     "keyColor": "yellow", "format": "{name} ({cores-logical})" },
+        { "type": "gpu",     "key": "│ 󰢮 GPU",     "hideType": "integrated", "format": "{name}" },
+        {
+            "type": "command", "key": "│ 󰍹 Tela",
+            "text": "for s in /sys/class/drm/card*-eDP-*/status; do grep -q '^connected' $s && d=$(basename $(readlink -f ${s%/*}/device/device/driver)); done; [ \"$d\" = nvidia ] && echo 'NVIDIA RTX 4050 · dGPU (MUX)' || echo 'AMD Radeon 740M · iGPU (Hybrid)'"
+        },
+        { "type": "memory",  "key": "│ 󰍛 RAM" },
+        { "type": "disk",    "key": "│ 󰋊 Disco",   "folders": "/", "format": "{size-used} / {size-total} ({size-percentage})" },
+        { "type": "battery", "key": "│ 󰁹 Bateria", "format": "{capacity} · {status}" },
+        { "type": "custom", "format": "\u001b[90m└─────────────────────────────────────┘" }
+    ]
+}

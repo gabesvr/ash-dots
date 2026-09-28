@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# wallpaper — troca de wallpaper leve (swaybg + fuzzel, nada rodando em segundo plano além do swaybg)
+#
+#   wallpaper              reaplica o último (login)
+#   wallpaper <imagem>     define uma imagem
+#   wallpaper pick         escolhe pelo fuzzel            (SUPER+SHIFT+W)
+#   wallpaper next | prev  próximo / anterior da pasta    (SUPER+ALT+W / SUPER+ALT+SHIFT+W)
+#
+# Imagens: ~/Pictures/Wallpapers   ·   Atual: ~/.config/wallpaper (link)
+
+dir="$HOME/Pictures/Wallpapers"
+link="$HOME/.config/wallpaper"
+
+list() { find "$dir" -maxdepth 1 -type f -iregex '.*\.\(jpe?g\|png\|webp\)' | sort; }
+
+apply() {
+    local old
+    old=$(pgrep -x swaybg)
+    if [[ -e $link ]]; then
+        setsid swaybg -m fill -i "$link" >/dev/null 2>&1 &
+    else
+        setsid swaybg -c '#2a2b31' >/dev/null 2>&1 &
+    fi
+    # o novo sobe antes de matar o antigo → sem piscar preto
+    [[ -n $old ]] && { sleep 0.2; kill $old; }
+}
+
+set_to() { ln -sf "$(realpath "$1")" "$link"; apply; }
+
+step() {
+    mapfile -t files < <(list)
+    (( ${#files[@]} )) || exit 1
+    local cur i
+    cur=$(readlink "$link")
+    for i in "${!files[@]}"; do [[ ${files[i]} == "$cur" ]] && break; done
+    [[ ${files[i]} == "$cur" ]] || i=-1
+    set_to "${files[( (i + $1) % ${#files[@]} + ${#files[@]}) % ${#files[@]}]}"
+}
+
+pick() {
+    mapfile -t files < <(list)
+    (( ${#files[@]} )) || exit 1
+    local i
+    # nome limpo: sem extensão, sem "-4k-wallpaper-site.com-…", traços viram espaços
+    i=$(for f in "${files[@]}"; do
+            f=${f##*/}; f=${f%.*}; f=$(sed -E 's/-?[0-9]+k-wallpaper.*$//I; s/-wallpaper.*$//I' <<<"$f")
+            echo "${f//-/ }"
+        done |
+        fuzzel --dmenu --index --prompt "󰸉  " --placeholder "Wallpaper…" --lines 10) || exit 0
+    set_to "${files[i]}"
+}
+
+case $1 in
+    "")    apply ;;
+    pick)  pick ;;
+    next)  step 1 ;;
+    prev)  step -1 ;;
+    *)     set_to "$1" ;;
+esac

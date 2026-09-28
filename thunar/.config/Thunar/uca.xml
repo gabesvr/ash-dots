@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+<action>
+	<icon>utilities-terminal</icon>
+	<name>Abrir terminal aqui</name>
+	<submenu></submenu>
+	<unique-id>foot-here</unique-id>
+	<command>foot -D %f</command>
+	<description>Abre o foot nesta pasta</description>
+	<range></range>
+	<patterns>*</patterns>
+	<startup-notify/>
+	<directories/>
+</action>
+<action>
+	<icon>edit-copy</icon>
+	<name>Copiar caminho</name>
+	<submenu></submenu>
+	<unique-id>copy-path</unique-id>
+	<command>printf '%s' %f | wl-copy</command>
+	<description>Copia o caminho completo</description>
+	<range></range>
+	<patterns>*</patterns>
+	<directories/>
+	<audio-files/>
+	<image-files/>
+	<other-files/>
+	<text-files/>
+	<video-files/>
+</action>
+</actions>

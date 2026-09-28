@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# yambar: estado das workspaces do Hyprland (1–10), reagindo a eventos do socket2.
+# Emite ws1..ws10 = active | occupied | empty
+
+emit() {
+    local active occupied
+    active=$(hyprctl activeworkspace -j | jq '.id')
+    occupied=$(hyprctl workspaces -j | jq -r '.[] | select(.windows > 0) | .id')
+    for i in {1..10}; do
+        local state=empty
+        grep -qx "$i" <<<"$occupied" && state=occupied
+        [[ $i == "$active" ]] && state=active
+        echo "ws$i|string|$state"
+    done
+    echo
+}
+
+emit
+socat -u "UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock" - |
+    while read -r ev; do
+        case $ev in
+            workspace*|createworkspace*|destroyworkspace*|focusedmon*|openwindow*|closewindow*|movewindow*) emit ;;
+        esac
+    done

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# bar — (re)inicia o yambar no monitor principal (o externo, se houver).
+# Gera a config a partir de ~/.config/yambar/config.yml.in ajustando os tamanhos à escala:
+# o yambar desenha em escala inteira (arredondada pra cima) e o Hyprland reduz,
+# então em escala 1.25 tudo é multiplicado por 2/1.25 = 1.6; em escala 1, por 1.
+# Chamado no login e sempre que um monitor entra/sai (conf/monitors.lua).
+exec 9>"$XDG_RUNTIME_DIR/bar.lock"
+flock -n 9 || exit 0
+sleep 0.3   # deixa os monitores se acomodarem (vários eventos seguidos no hotplug)
+
+# Tela do notebook no estado certo: apagada com monitor externo, acesa sem ele.
+# O reload reaplica conf/monitors.lua (o eval não consegue religar um monitor desligado).
+# Só recarrega se estiver errado, para não entrar em loop (o reload também gera eventos).
+read -r external laptop_off < <(hyprctl monitors all -j | jq -r '[any(.[]; (.name | test("^(HDMI|DP)")) and (.disabled | not)), any(.[]; .name == "eDP-1" and .disabled)] | @tsv')
+if [[ $external != "$laptop_off" ]]; then
+    hyprctl reload >/dev/null
+    sleep 0.5
+fi
+
+tpl="$HOME/.config/yambar/config.yml.in"
+out="$XDG_RUNTIME_DIR/yambar.yml"
+
+# externo primeiro; eDP-1 só se for o único
+read -r name scale < <(hyprctl monitors -j | jq -r 'sort_by(.name == "eDP-1") | .[0] | "\(.name) \(.scale)"')
+[[ -n $name ]] || exit 1
+factor=$(awk -v s="$scale" 'BEGIN { c = int(s); if (c < s) c++; printf "%.4f", c / s }')
+
+perl -pe "s/%(\d+)%/int(\$1 * $factor + 0.5)/ge; s/\@MONITOR\@/$name/" "$tpl" > "$out"
+
+pkill -x yambar
+pkill -x ash-tray
+pkill -f '^bash [^ ]*/yambar-(status|workspaces)$'
+LC_TIME=pt_BR.UTF-8 setsid yambar -c "$out" >/dev/null 2>&1 9>&- &   # 9>&-: filhos não herdam a trava

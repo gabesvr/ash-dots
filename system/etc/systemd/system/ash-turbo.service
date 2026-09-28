@@ -1,0 +1,12 @@
+[Unit]
+Description=Reaplica o modo TURBO/BAL conforme o perfil de energia salvo
+After=power-profiles-daemon.service nvidia-persistenced.service scx_loader.service
+Wants=power-profiles-daemon.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ash-turbo sync
+
+# power-profiles-daemon (CachyOS) roda depois do multi-user.target → ficar no graphical evita ciclo de ordem no boot
+[Install]
+WantedBy=graphical.target

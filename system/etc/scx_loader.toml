@@ -1,0 +1,3 @@
+# scx_loader — agendador sched-ext padrão (o ash-turbo troca para o modo gaming no TURBO)
+default_sched = "scx_lavd"
+default_mode = "Auto"

@@ -1,0 +1,3 @@
+# Nome estável para a GPU NVIDIA (o número cardN pode mudar entre boots).
+# Usado por AQ_DRM_DEVICES para o Hyprland rodar só na NVIDIA.
+SUBSYSTEM=="drm", KERNEL=="card*", KERNELS=="0000:01:00.0", SYMLINK+="dri/nvidia-card"

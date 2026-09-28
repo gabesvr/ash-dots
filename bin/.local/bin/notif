@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# notif — controle das notificações (fnott)
+#   notif clear              fecha todas
+#   notif dnd [toggle|on|off] modo não perturbe (segura as notificações e mostra depois)
+#   notif status             "dnd" ou "on" (usado pela barra)
+#   notif reset              desliga o não perturbe (login)
+flag="$XDG_RUNTIME_DIR/notif-dnd"
+
+# fnott sobe sob demanda via D-Bus; o fnottctl não o inicia sozinho
+wake() {
+    pgrep -x fnott >/dev/null || busctl --user call org.freedesktop.Notifications \
+        /org/freedesktop/Notifications org.freedesktop.Notifications GetServerInformation >/dev/null
+}
+
+refresh_bar() { pkill -USR1 -f '^bash [^ ]*/yambar-status$'; }
+
+case ${1:-status} in
+    clear)
+        pgrep -x fnott >/dev/null || exit 0
+        for id in $(fnottctl list | awk '/^[0-9]+:/{sub(":","",$1); print $1}'); do fnottctl dismiss "$id"; done
+        ;;
+    dnd)
+        mode=${2:-toggle}
+        [[ $mode == toggle ]] && { [[ -e $flag ]] && mode=off || mode=on; }
+        wake
+        if [[ $mode == on ]]; then fnottctl pause && touch "$flag"
+        else fnottctl unpause; rm -f "$flag"; fi
+        refresh_bar
+        ;;
+    status) [[ -e $flag ]] && echo dnd || echo on ;;
+    reset)  rm -f "$flag" ;;
+esac
