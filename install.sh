@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-PKGS=(hypr foot fish fastfetch fuzzel apps yambar fnott cava gaming thunar gtk xdg bin)
+PKGS=(hypr foot fish nvim fastfetch fuzzel apps yambar fnott cava gaming thunar gtk xdg bin)
 
 echo "==> Pacotes"
 grep -vx yambar packages.txt | sudo pacman -S --needed -
@@ -49,10 +49,20 @@ sudo sysctl --system >/dev/null
 sudo install -m644 system/etc/systemd/system/ash-turbo.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable ash-turbo.service
 sudo systemctl enable --now scx_loader.service
-sudo systemctl enable --now tailscaled.service
+sudo systemctl start tailscaled.service
 sudo tailscale set --operator="$USER"   # control-center liga/desliga sem sudo
+sudo systemctl disable --now tailscaled.service   # sob demanda (control-center / `s`), poupa RAM no boot
+# Sunshine (tela no celular via Moonlight): sob demanda (`tela-celular` / control-center); portas liberadas só para a LAN
+systemctl --user disable app-dev.lizardbyte.app.Sunshine.service 2>/dev/null || true
+sudo ufw allow from 192.168.0.0/23 to any proto tcp port 47984,47989,48010
+sudo ufw allow from 192.168.0.0/23 to any proto udp port 47998,47999,48000,48002,48010
+sudo systemctl disable --now switcheroo-control.service   # só dGPU: não serve para nada
 sudo systemctl disable --now avahi-daemon.service avahi-daemon.socket NetworkManager-wait-online.service || true
 sudo usermod -aG gamemode "$USER"
+# Limine: entrada do Windows (dual boot), só se o bootmgfw existir na ESP e ainda não estiver no limine.conf
+if sudo test -f /boot/EFI/Microsoft/Boot/bootmgfw.efi && ! sudo grep -q "^/Windows" /boot/limine.conf; then
+    printf "\n/Windows\n    protocol: efi\n    path: boot():/EFI/Microsoft/Boot/bootmgfw.efi\n" | sudo tee -a /boot/limine.conf >/dev/null
+fi
 
 echo "==> Thunar (xfconf reescreve o arquivo, então vai por comando)"
 T() { xfconf-query -c thunar -p "$1" -n -t "$2" -s "$3"; }

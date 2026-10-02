@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# mc-foco: dá um núcleo físico só para a "Render thread" do Minecraft.
+# O FPS do Minecraft é limitado por essa única thread; dividindo o núcleo (SMT)
+# com Distant Horizons, chunk builders e o JIT ela perde velocidade.
+# Escolhe o núcleo preferido (amd_pstate_prefcore_ranking), fixa a Render thread
+# nele e manda as demais threads do jogo para os outros núcleos. Reaplica a cada
+# 10 s porque o jogo cria threads novas. Chamado pelo gamemode ao abrir o jogo.
+
+log() { echo "mc-foco: $*" >&2; }
+
+# processo do Minecraft (Prism: org.prismlauncher.EntryPoint)
+achar_jogo() {
+    for p in $(pgrep -x java); do
+        grep -qs EntryPoint "/proc/$p/cmdline" && { echo "$p"; return; }
+    done
+}
+
+# núcleo físico com maior prefcore ranking -> "cpuA,cpuB" (irmãos SMT)
+nucleo_preferido() {
+    local best=0 rank c r
+    for c in /sys/devices/system/cpu/cpu[0-9]*; do
+        r=$(cat "$c/cpufreq/amd_pstate_prefcore_ranking" 2>/dev/null) || continue
+        (( r > best )) && { best=$r; rank=$c; }
+    done
+    cat "$rank/topology/thread_siblings_list"
+}
+
+# lista de CPUs online sem as do núcleo reservado
+outras_cpus() {
+    local reservado=",$1," out="" c
+    for c in $(seq 0 $(( $(nproc --all) - 1 ))); do
+        [[ $reservado == *",$c,"* ]] || out+="$c,"
+    done
+    echo "${out%,}"
+}
+
+pid=""
+for _ in $(seq 60); do pid=$(achar_jogo); [ -n "$pid" ] && break; sleep 2; done
+[ -z "$pid" ] && { log "Minecraft não encontrado"; exit 0; }
+
+irmaos=$(nucleo_preferido)          # ex.: 0,6
+cpu_render=${irmaos%%,*}            # só uma das duas CPUs lógicas: o irmão fica livre
+resto=$(outras_cpus "$irmaos")
+log "pid $pid · Render thread -> CPU $cpu_render · resto -> $resto"
+
+while kill -0 "$pid" 2>/dev/null; do
+    for t in /proc/$pid/task/*; do
+        tid=${t##*/}
+        if [ "$(cat "$t/comm" 2>/dev/null)" = "Render thread" ]; then
+            taskset -pc "$cpu_render" "$tid" >/dev/null 2>&1
+        else
+            taskset -pc "$resto" "$tid" >/dev/null 2>&1
+        fi
+    done
+    sleep 10
+done

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # control-center — central de controle no fuzzel (SUPER+C / clique no sino da barra)
-# Wi-Fi, Bluetooth, Tailscale, não perturbe, notificações, saída de áudio, perfil de energia, sessão.
+# Wi-Fi, Bluetooth, Tailscale, tela no celular, não perturbe, notificações, saída de áudio, perfil de energia, sessão.
 #
 # Cada menu recebe linhas "texto<TAB>chave": o fuzzel mostra o texto e devolve a chave.
 bin="$HOME/.local/bin"
@@ -94,11 +94,12 @@ bt_menu() {
 # up/down sem sudo: exige "sudo tailscale set --operator=$USER" (feito no install.sh)
 ts_on() { [[ $(tailscale status --json 2>/dev/null | jq -r .BackendState) == Running ]]; }
 
+# o daemon não sobe no boot (economiza RAM): liga/desliga o serviço junto
 ts_toggle() {
     if ts_on; then
-        tailscale down && notify-send -a Tailscale "Desligado"
+        tailscale down && sudo systemctl stop tailscaled && notify-send -a Tailscale "Desligado"
     else
-        tailscale up && notify-send -a Tailscale "Ligado" "$(tailscale ip -4)"
+        sudo systemctl start tailscaled && tailscale up && notify-send -a Tailscale "Ligado" "$(tailscale ip -4)"
     fi || notify-send -u critical -a Tailscale "Falha" "Rode: sudo tailscale set --operator=$USER"
 }
 
@@ -154,6 +155,8 @@ main() {
         else                row "󰂚  Não perturbe · desligado" dnd; fi
         if ts_on; then row "󰖂  Tailscale · ligado" ts
         else           row "󰖂  Tailscale · desligado" ts; fi
+        if [[ $("$bin/tela-celular" status) == ligado* ]]; then row "󰍹  Tela no celular · ligado" phone
+        else row "󰍹  Tela no celular · desligado" phone; fi
         row "󰎟  Fechar notificações ($notifs)" clear
         row "󰕾  Áudio · $(default_sink_name)"  audio
         row "󱐋  Energia · $profile"            profile
@@ -166,6 +169,7 @@ main() {
         dnd)     "$bin/notif" dnd toggle ;;
         clear)   "$bin/notif" clear ;;
         ts)      ts_toggle ;;
+        phone)   "$bin/tela-celular" toggle ;;
         audio)   audio_menu ;;
         profile) profile_menu ;;
         session) session_menu ;;

@@ -1,0 +1,238 @@
+diff --git a/match.c b/match.c
+index a2e3ff8..2741c49 100644
+--- a/match.c
++++ b/match.c
+@@ -58,6 +58,7 @@ struct matches {
+ 
+     size_t page_count;
+     size_t selected;
++    size_t first;  /* first visible match (scroll offset) */
+     size_t max_matches_per_page;
+     size_t fuzzy_min_length;
+     size_t fuzzy_max_length_discrepancy;
+@@ -594,6 +595,60 @@ matches_max_matches_per_page_set(struct matches *matches, size_t max_matches)
+     matches->max_matches_per_page = max_matches;
+ }
+ 
++/*
++ * First visible match. Keeps the selected match inside the view, moving the
++ * view as little as possible from where it was last shown.
++ */
++static size_t
++view_first(const struct matches *matches)
++{
++    struct matches *m = (struct matches *)matches;
++    const size_t max = m->max_matches_per_page;
++
++    if (max == 0 || m->match_count <= max) {
++        m->first = 0;
++        return 0;
++    }
++
++    size_t f = m->first;
++    if (m->selected < f)
++        f = m->selected;
++    else if (m->selected >= f + max)
++        f = m->selected - max + 1;
++    if (f > m->match_count - max)
++        f = m->match_count - max;
++
++    m->first = f;
++    return f;
++}
++
++bool
++matches_scroll(struct matches *matches, int lines)
++{
++    const size_t max = matches->max_matches_per_page;
++    if (max == 0 || matches->match_count <= max)
++        return false;
++
++    const size_t f = view_first(matches);
++    const size_t last = matches->match_count - max;
++    size_t nf;
++
++    if (lines < 0)
++        nf = (size_t)-lines > f ? 0 : f - (size_t)-lines;
++    else
++        nf = min(f + (size_t)lines, last);
++
++    if (nf == f)
++        return false;
++
++    matches->first = nf;
++    if (matches->selected < nf)
++        matches->selected = nf;
++    else if (matches->selected >= nf + max)
++        matches->selected = nf + max - 1;
++    return true;
++}
++
+ size_t
+ matches_get_page_count(const struct matches *matches)
+ {
+@@ -613,17 +668,17 @@ matches_get_page(const struct matches *matches)
+ size_t
+ match_get_idx(const struct matches *matches, size_t idx)
+ {
+-    const size_t page_no = matches_get_page(matches);
++    const size_t first = view_first(matches);
+     const size_t items_on_page UNUSED = matches_get_count(matches);
+ 
+     LOG_DBG(
+         "page-count: %zu, page-no: %zu, items-on-page: %zu, idx: %zu, max: %zu, "
+         "match-count: %zu",
+-        matches->page_count, page_no, items_on_page, idx,
++        matches->page_count, first, items_on_page, idx,
+         matches->max_matches_per_page, matches->match_count);
+ 
+     assert(idx < items_on_page);
+-    idx += page_no * matches->max_matches_per_page;
++    idx += first;
+ 
+     assert(idx < matches->match_count);
+     return idx;
+@@ -653,18 +708,11 @@ size_t
+ matches_get_count(const struct matches *matches)
+ {
+     const size_t total = matches->match_count;
+-    const size_t page_no = matches_get_page(matches);
+ 
+-    if (matches->max_matches_per_page == 0)
++    if (matches->max_matches_per_page == 0 || total == 0)
+         return 0;
+ 
+-    if (total == 0)
+-        return 0;
+-    else if (page_no + 1 >= matches->page_count) {
+-        size_t remainder = total % matches->max_matches_per_page;
+-        return remainder == 0 ? matches->max_matches_per_page : remainder;
+-    } else
+-        return matches->max_matches_per_page;
++    return min(matches->max_matches_per_page, total - view_first(matches));
+ }
+ 
+ size_t
+@@ -677,7 +725,7 @@ size_t
+ matches_get_match_index(const struct matches *matches)
+ {
+     return matches->max_matches_per_page != 0
+-        ? matches->selected % matches->max_matches_per_page
++        ? matches->selected - view_first(matches)
+         : 0;
+ }
+ 
+@@ -780,10 +828,11 @@ matches_selected_next(struct matches *matches, bool wrap)
+ bool
+ matches_selected_prev_page(struct matches *matches, bool scrolling)
+ {
+-    const size_t page_no = matches_get_page(matches);
+-    if (page_no > 0) {
+-        assert(matches->selected >= matches->max_matches_per_page);
+-        matches->selected -= matches->max_matches_per_page;
++    const size_t max = matches->max_matches_per_page;
++    const size_t f = view_first(matches);
++    if (f > 0) {
++        matches->first = f > max ? f - max : 0;
++        matches->selected = matches->selected > max ? matches->selected - max : 0;
+         return true;
+     } else if (!scrolling && matches->selected > 0) {
+         matches->selected = 0;
+@@ -796,8 +845,10 @@ matches_selected_prev_page(struct matches *matches, bool scrolling)
+ bool
+ matches_selected_next_page(struct matches *matches, bool scrolling)
+ {
+-    const size_t page_no = matches_get_page(matches);
+-    if (page_no + 1 < matches->page_count) {
++    const size_t max = matches->max_matches_per_page;
++    const size_t f = view_first(matches);
++    if (max > 0 && f + max < matches->match_count) {
++        matches->first = f + max;
+         matches->selected = min(
+             matches->selected + matches->max_matches_per_page,
+             matches->match_count - 1);
+diff --git a/match.h b/match.h
+index 104ee0a..69fc390 100644
+--- a/match.h
++++ b/match.h
+@@ -79,3 +79,4 @@ bool matches_selected_next(struct matches *matches, bool wrap);
+ 
+ bool matches_selected_prev_page(struct matches *matches, bool scrolling);
+ bool matches_selected_next_page(struct matches *matches, bool scrolling);
++bool matches_scroll(struct matches *matches, int lines);
+diff --git a/wayland.c b/wayland.c
+index f78bdab..cbcb999 100644
+--- a/wayland.c
++++ b/wayland.c
+@@ -1156,6 +1156,22 @@ select_hovered_match(struct seat *seat, bool refresh_always)
+     wayl_refresh(wayl);
+ }
+ 
++/* Scroll the list; the row under the pointer stays selected */
++static bool
++scroll_view(struct seat *seat, int lines)
++{
++    struct wayland *wayl = seat->wayl;
++    if (!matches_scroll(wayl->matches, lines))
++        return false;
++
++    ssize_t row = render_get_row_num(
++        wayl->render, wayl->width, seat->pointer.x, seat->pointer.y,
++        wayl->matches);
++    if (row >= 0)
++        matches_idx_select(wayl->matches, row);
++    return true;
++}
++
+ static void
+ wl_pointer_enter(void *data, struct wl_pointer *wl_pointer,
+                  uint32_t serial, struct wl_surface *surface,
+@@ -1285,7 +1301,9 @@ wl_pointer_frame(void *data, struct wl_pointer *wl_pointer)
+     struct wayland *wayl = seat->wayl;
+ 
+     if (seat->pointer.discrete_used) {
++        /* Wheel notch already handled; drop the continuous value too */
+         seat->pointer.discrete_used = false;
++        seat->pointer.accumulated_scroll = 0.;
+         return;
+     }
+ 
+@@ -1297,15 +1315,15 @@ wl_pointer_frame(void *data, struct wl_pointer *wl_pointer)
+     while (fabs(seat->pointer.accumulated_scroll) > threshold) {
+         if (seat->pointer.accumulated_scroll > 0.) {
+             seat->pointer.accumulated_scroll -= threshold;
+-            refresh = matches_selected_next(wayl->matches, true);
++            refresh |= scroll_view(seat, 1);
+         } else {
+             seat->pointer.accumulated_scroll += threshold;
+-            refresh = matches_selected_prev(wayl->matches, true);
++            refresh |= scroll_view(seat, -1);
+         }
+     }
+ 
+     if (refresh)
+-        select_hovered_match(seat, true);
++        wayl_refresh(wayl);
+ }
+ 
+ static void
+@@ -1335,17 +1353,8 @@ wl_pointer_axis_discrete(void *data, struct wl_pointer *wl_pointer,
+ 
+     seat->pointer.discrete_used = true;
+ 
+-    bool refresh = false;
+-    if (discrete > 0) {
+-        for (int i = 0; i < discrete; i++)
+-            refresh = matches_selected_next(wayl->matches, true);
+-    } else {
+-        for (int i = 0; i < -discrete; i++)
+-            refresh = matches_selected_prev(wayl->matches, true);
+-    }
+-
+-    if (refresh)
+-        select_hovered_match(seat, true);
++    if (scroll_view(seat, discrete))
++        wayl_refresh(wayl);
+ }
+ 
+ static const struct wl_pointer_listener pointer_listener = {

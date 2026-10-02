@@ -1,0 +1,10 @@
+# Avisa quando o pacman trocar o fuzzel com patch pelo oficial (versão nova)
+[Trigger]
+Operation = Upgrade
+Type = Package
+Target = fuzzel
+
+[Action]
+Description = fuzzel atualizado: se a rolagem do mouse voltou a falhar, rode ~/dots/src/fuzzel/build.sh
+When = PostTransaction
+Exec = /bin/true

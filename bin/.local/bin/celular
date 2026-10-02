@@ -1,0 +1,20 @@
+#!/bin/bash
+# Espelha o S24 via USB. Uso: celular [filme] [opções extras do scrcpy]
+#   celular        -> uso geral fluido (120 fps, 1600 px)
+#   celular filme  -> tela cheia, resolução nativa do celular, 60 fps
+adb start-server >/dev/null 2>&1
+if [ "$1" = "filme" ]; then
+  shift
+  exec scrcpy \
+    --video-codec=h264 --video-encoder=c2.qti.avc.encoder \
+    --video-bit-rate=30M --max-fps=60 \
+    --audio-codec=opus --audio-buffer=30 \
+    --render-driver=opengl \
+    --window-title=S24 --stay-awake -f "$@"
+fi
+exec scrcpy \
+  --video-codec=h264 --video-encoder=c2.qti.avc.encoder \
+  --video-bit-rate=20M --max-fps=120 -m 1600 \
+  --audio-codec=opus --audio-buffer=30 \
+  --render-driver=opengl \
+  --window-title=S24 --stay-awake "$@"

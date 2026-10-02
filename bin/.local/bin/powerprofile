@@ -2,7 +2,7 @@
 # powerprofile toggle|eco|set <perfil> — troca o perfil de energia e atualiza o yambar na hora
 #   toggle: balanced ⇄ TURBO          (clique esquerdo na barra)
 #   eco:    power-saver ⇄ balanced     (clique direito)
-#   set performance|balanced|power-saver   (gamemode)
+#   set performance|balanced|power-saver   (uso manual; o gamemode NÃO chama mais: ele usa ash-turbo game)
 # TURBO = /usr/local/bin/ash-turbo (ventoinhas 100%, GPU P0 + overclock, limites no máximo)
 cur=$(powerprofilesctl get)
 case ${1:-toggle} in

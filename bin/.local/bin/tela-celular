@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# tela-celular — liga/desliga o Sunshine (tela do PC no celular via Moonlight, pelo Wi-Fi)
+# Uso: tela-celular [on|off|toggle|status]   (sem argumento = toggle)
+# Sob demanda: o serviço não sobe no boot (poupa RAM). Painel/PIN: https://localhost:47990
+svc=app-dev.lizardbyte.app.Sunshine.service
+
+is_on() { systemctl --user is-active --quiet "$svc"; }
+
+lan_ip() { ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p'; }
+
+on() {
+    is_on && return
+    systemctl --user start "$svc" && notify-send -a "Tela no celular" "Ligado" "Moonlight → $(lan_ip)" \
+        || notify-send -u critical -a "Tela no celular" "Falha ao ligar o Sunshine"
+}
+
+off() {
+    is_on || return
+    systemctl --user stop "$svc" && notify-send -a "Tela no celular" "Desligado"
+}
+
+case ${1:-toggle} in
+    on)     on ;;
+    off)    off ;;
+    toggle) if is_on; then off; else on; fi ;;
+    status) if is_on; then echo "ligado ($(lan_ip))"; else echo "desligado"; fi ;;
+    *)      echo "uso: tela-celular [on|off|toggle|status]" >&2; exit 2 ;;
+esac

@@ -1,0 +1,4 @@
+fuzzel/
+src/
+pkg/
+*.pkg.tar.zst

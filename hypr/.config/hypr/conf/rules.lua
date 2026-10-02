@@ -28,6 +28,18 @@ hl.window_rule({
     idle_inhibit = "always",
 })
 
+-- Minecraft Java nativo no Wayland: a classe muda entre versões/launchers,
+-- o título ("Minecraft* 26.2 - ...") não. Mesmo tratamento dos jogos acima.
+hl.window_rule({
+    name        = "minecraft-immediate",
+    match       = { title = "^Minecraft.*" },
+    immediate   = true,
+    no_anim     = true,
+    no_blur     = true,
+    no_shadow   = true,
+    idle_inhibit = "always",
+})
+
 -- Terminal flutuante (SUPER+T)
 hl.window_rule({
     name  = "foot-float",

@@ -5,6 +5,9 @@
 #   on     perfil performance + ventoinhas 100% + GPU em P0 com overclock + limites ASUS no máximo
 #   off    volta tudo ao automático (perfil balanced)
 #   sync   aplica on/off conforme o perfil atual (usado no boot)
+#   game   on|off — modo jogo leve, chamado pelo gamemode: scx gaming + overclock da GPU, sem mexer em
+#          ventoinhas/limites (o turbo completo só liga pelo botão da barra)
+#   fans   curve|max|auto — só as ventoinhas (curve = curva do balanceado)
 #   status mostra o estado atual
 set -u
 
@@ -26,16 +29,48 @@ armoury_max() {  # põe um atributo ASUS no valor máximo permitido
     [[ -f $a/max_value ]] && cat "$a/max_value" > "$a/current_value"
 }
 
-fans() {  # max = curva toda em 100% · auto = curva de fábrica do perfil
-    local p i
+# Curva do balanceado: nunca desliga (piso ~27%), sobe cedo e teto ~78% (não vai a 100%). pwm 0-255.
+CURVE_PWM=(70 85 105 130 155 180 200 200)
+CURVE_TEMP1=(45 55 62 68 74 79 84 88)   # ventoinha 1 (CPU)
+CURVE_TEMP2=(40 50 58 64 70 75 80 85)   # ventoinha 2 (GPU)
+
+fans() {  # max = curva toda em 100% · curve = curva do balanceado · auto = curva de fábrica do perfil
+    local p i t
     for p in 1 2; do
-        if [[ $1 == max ]]; then
-            for i in {1..8}; do echo 255 > "$FAN_CURVE/pwm${p}_auto_point${i}_pwm"; done
-            echo 1 > "$FAN_CURVE/pwm${p}_enable"
-        else
-            echo 2 > "$FAN_CURVE/pwm${p}_enable"
-        fi
+        case $1 in
+            max)
+                for i in {1..8}; do echo 255 > "$FAN_CURVE/pwm${p}_auto_point${i}_pwm"; done
+                echo 1 > "$FAN_CURVE/pwm${p}_enable" ;;
+            curve)
+                for i in {0..7}; do
+                    t=CURVE_TEMP$p[i]
+                    echo "${CURVE_PWM[i]}" > "$FAN_CURVE/pwm${p}_auto_point$((i+1))_pwm"
+                    echo "${!t}" > "$FAN_CURVE/pwm${p}_auto_point$((i+1))_temp"
+                done
+                echo 1 > "$FAN_CURVE/pwm${p}_enable" ;;
+            *) echo 2 > "$FAN_CURVE/pwm${p}_enable" ;;
+        esac
     done
+}
+
+fan_mode() {
+    [[ $(cat "$FAN_CURVE"/pwm1_enable) == 1 ]] || { echo auto; return; }
+    [[ $(cat "$FAN_CURVE"/pwm1_auto_point1_pwm) == 255 ]] && echo 100% || echo curva
+}
+
+scx_enabled() { [[ $(cat /sys/kernel/sched_ext/state 2>/dev/null) == enabled ]]; }
+
+scx_set() {  # coloca o scx_lavd no modo $1 (auto|gaming); "switch" só funciona com um agendador já rodando
+    timeout 10 scxctl switch -s lavd -m "$1" >/dev/null 2>&1 ||
+        timeout 10 scxctl start -s lavd -m "$1" >/dev/null 2>&1
+}
+
+scx() {  # o scx_loader já travou no boot dizendo "running" sem o kernel carregar nada → confere e reinicia
+    local i
+    scx_set "$1"
+    for i in {1..8}; do scx_enabled && return; sleep 1; done  # o lavd leva ~3 s para inicializar
+    systemctl restart scx_loader
+    scx_set "$1"
 }
 
 on() {
@@ -51,21 +86,34 @@ on() {
     max_mem=$(nvidia-smi --query-gpu=clocks.max.memory --format=csv,noheader,nounits)
     nvidia-smi -lgc "$GPU_MIN_LOCK,$((max_gr + GPU_CORE_OFFSET))" >/dev/null
     nvidia-smi -lmc "$max_mem,$max_mem" >/dev/null
-    scxctl switch -s lavd -m gaming >/dev/null 2>&1
+    scx gaming
 }
 
 off() {
     nvidia-smi -rgc >/dev/null
     nvidia-smi -rmc >/dev/null
     nv_offsets 0 0
-    fans auto
-    scxctl switch -s lavd -m auto >/dev/null 2>&1
+    fans curve
+    scx auto
     [[ ${1:-} == keep-profile ]] || powerprofilesctl set balanced
+}
+
+game() {  # modo jogo LEVE (gamemode): só agendador gaming + overclock da GPU. Sem ventoinhas 100% nem limites no máximo.
+    if [[ $1 == on ]]; then
+        [[ $(powerprofilesctl get) == performance ]] && return   # turbo já ligado pelo botão: ele cuida de tudo
+        nvidia-smi -pm 1 >/dev/null
+        nv_offsets "$GPU_CORE_OFFSET" "$GPU_MEM_OFFSET"
+        scx gaming
+    else
+        [[ $(powerprofilesctl get) == performance ]] && return   # turbo ligado: não mexe
+        nv_offsets 0 0
+        scx auto
+    fi
 }
 
 status() {
     echo "perfil:     $(powerprofilesctl get)"
-    echo "ventoinhas: $( [[ $(cat "$FAN_CURVE"/pwm1_enable) == 1 ]] && echo 100% || echo auto) · $(cat "$FAN_HWMON"/fan1_input) / $(cat "$FAN_HWMON"/fan2_input) RPM"
+    echo "ventoinhas: $(fan_mode) · $(cat "$FAN_HWMON"/fan1_input) / $(cat "$FAN_HWMON"/fan2_input) RPM"
     echo "cpu:        $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor) · boost $(cat /sys/devices/system/cpu/cpufreq/boost) · PPT $(cat $ARMOURY/ppt_pl1_spl/current_value)W"
     echo "gpu:        $(nvidia-smi --query-gpu=pstate,clocks.gr,clocks.mem,power.draw,temperature.gpu --format=csv,noheader)"
     echo "scx:        $(scxctl get)"
@@ -75,6 +123,8 @@ case ${1:-status} in
     on)     on ;;
     off)    off ;;
     sync)   [[ $(powerprofilesctl get) == performance ]] && on || off keep-profile ;;
+    game)   game "${2:-on}" ;;
+    fans)   fans "${2:-curve}" ;;
     status) status ;;
-    *)      echo "uso: ash-turbo on|off|sync|status" >&2; exit 1 ;;
+    *)      echo "uso: ash-turbo on|off|sync|game on|off|status" >&2; exit 1 ;;
 esac

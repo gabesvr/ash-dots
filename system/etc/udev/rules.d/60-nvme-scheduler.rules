@@ -1,2 +1,2 @@
-# NVMe: sem scheduler de I/O = menor latência
-ACTION=="add|change", KERNEL=="nvme[0-9]*n[0-9]*", ATTR{queue/scheduler}="none"
+# NVMe: sem scheduler de I/O = menor latência (só o disco inteiro, não as partições)
+ACTION=="add|change", KERNEL=="nvme[0-9]*n[0-9]*", ENV{DEVTYPE}=="disk", ATTR{queue/scheduler}="none"
